@@ -60,10 +60,11 @@ class getHoliday(object):
     @staticmethod
     def get_current_isoweekday(today=None):
         '''获取当前的星期数（返回数字1-7代表周一到周日）'''
-        if not today:
-            return datetime.datetime.now().isoweekday()
-        else:
-            return datetime.datetime.strptime(today, "%Y-%m-%d").isoweekday()
+        return (
+            datetime.datetime.strptime(today, "%Y-%m-%d").isoweekday()
+            if today
+            else datetime.datetime.now().isoweekday()
+        )
 
     def get_holiday_json(self, current_year=None):
         '''
@@ -78,21 +79,16 @@ class getHoliday(object):
             try:
                 url = 'https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/{year}.json'.format(year=current_year)
                 res = requests.get(url=url, timeout=5)
-                if res.status_code == 200:
-                    with open(f"{current_year}.json", 'w', encoding='utf-8') as f:
-                        json.dump(res.json(), f, ensure_ascii=False, indent=4)
-                    return res.json()['days']
-                else:
+                if res.status_code != 200:
                     print('主网址请求失败，正在发起重试！！！')
                     url = 'https://natescarlet.coding.net/p/github/d/holiday-cn/git/raw/master/{year}.json'.format(
                         year=current_year)
                     res = requests.get(url=url, timeout=5)
                     if res.status_code == 404:
                         raise YearKeyError(current_year)
-                    else:
-                        with open(f"{current_year}.json", 'w', encoding='utf-8') as f:
-                            json.dump(res.json(), f, ensure_ascii=False, indent=4)
-                    return res.json()['days']
+                with open(f"{current_year}.json", 'w', encoding='utf-8') as f:
+                    json.dump(res.json(), f, ensure_ascii=False, indent=4)
+                return res.json()['days']
             except:
                 try:
                     print('主网址发生未知错误，正在请求备用站点！！！')
@@ -102,9 +98,8 @@ class getHoliday(object):
                     res = requests.get(url=url)
                     if res.status_code == 404:
                         raise YearKeyError(current_year)
-                    else:
-                        with open(f"{current_year}.json", 'w', encoding='utf-8') as f:
-                            json.dump(res.json(), f, ensure_ascii=False, indent=4)
+                    with open(f"{current_year}.json", 'w', encoding='utf-8') as f:
+                        json.dump(res.json(), f, ensure_ascii=False, indent=4)
                     return res.json()['days']
                 except:
                     raise HolidayError()
@@ -131,15 +126,14 @@ class getHoliday(object):
         data_list = []
         for i in year_list:
             res = self.get_holiday_json(current_year=i)
-            for n in res:
-                data_list.append(n)
+            data_list.extend(iter(res))
         return data_list, e_status
 
     @staticmethod
     def get_weekday_enum_cn(week_day: int) -> str:
         '''获取中文的星期数枚举'''
         #TODO 可能会越界
-        return ['周一', '周二', '周三', '周四', '周五', '周六', '周日'][int(week_day)-1]
+        return ['周一', '周二', '周三', '周四', '周五', '周六', '周日'][week_day - 1]
 
     def get_today_data(self, today=None, current_year=None):
         '''获取今天的日期数据'''
@@ -149,10 +143,7 @@ class getHoliday(object):
         all_holiday_status = all_holiday_json[1]
         # 判断当前是周几，如果大于周五的话，就代表是休息日
         isoweekday = self.get_current_isoweekday(today=today)
-        if isoweekday > 5:
-            is_off_day = True
-        else:
-            is_off_day = False
+        is_off_day = isoweekday > 5
         today_data = {'name': '', 'date': today, 'isOffDay': is_off_day}
         for i in all_holiday_json[0]:
             # 兼容入参的today格式多样化（如：2020-10-1或者2020-1-1）
@@ -193,10 +184,12 @@ class getHoliday(object):
         :return:
         """
         # 获取年份
-        if not today:
-            year_data = datetime.datetime.now().strftime('%Y')
-        else:
-            year_data = datetime.datetime.strptime(today, "%Y-%m-%d").date().year
+        year_data = (
+            datetime.datetime.strptime(today, "%Y-%m-%d").date().year
+            if today
+            else datetime.datetime.now().strftime('%Y')
+        )
+
         today_d = self.get_today_data(today=today, current_year=year_data)
         today_data, today_status = today_d[0], today_d[1]
         # today_status = self.get_today_data(today=today, current_year=year_data)[1]
